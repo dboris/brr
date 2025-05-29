@@ -22,4 +22,10 @@
   test_worker
   top)
  (libraries brr brr.ocaml_poke_ui brr.poke)
- (modes js))
+ (modes js)
+ (js_of_ocaml
+  (flags :standard --toplevel)))
+
+(alias
+ (name all)
+ (deps package.json min.html))
