@@ -1,0 +1,25 @@
+(executables
+ (names
+  min
+  nop
+  poke
+  test_audio
+  test_base64
+  test_c2d
+  test_clipboard
+  test_console
+  test_crypto
+  test_fact
+  test_file
+  test_geolocation
+  test_gl
+  test_gpu
+  test_hello
+  test_history
+  test_media
+  test_midi
+  test_notification
+  test_worker
+  top)
+ (libraries brr brr.ocaml_poke_ui brr.poke)
+ (modes js))
