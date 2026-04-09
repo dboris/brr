@@ -67,6 +67,10 @@ val race : 'a t list -> 'a t
 val of_fut_result : ('a, exn) Fut.result -> 'a t
 (** [of_fut_result f] is [f] viewed as a promise. *)
 
+val of_fut_result' : error:('e -> exn) -> ('a, 'e) Fut.result -> 'a t
+(** [of_fut_result' ~error f] is [f] viewed as a promise after mapping
+    future errors with [error]. *)
+
 val to_fut_result : 'a t -> ('a, exn) Fut.result
 (** [to_fut_result p] is [p] viewed as a future result. *)
 

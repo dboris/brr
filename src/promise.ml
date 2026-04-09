@@ -104,6 +104,7 @@ let race ps =
       p
 
 let of_fut_result p = p
+let of_fut_result' ~error p = Fut.map (Result.map_error error) p
 let to_fut_result p = p
 
 let of_promise ~ok p = Fut.of_promise' ~ok ~error:exn_of_jv p

@@ -160,6 +160,12 @@ module Gpu : sig
       ?size:int -> ?offset:int -> t -> Map_mode.t -> unit Fut.or_error
     (** [map_async b] {{:https://developer.mozilla.org/en-US/docs/Web/API/GPUBuffer/mapAsync}maps} [b]. *)
 
+    val map_async_p :
+      ?size:int -> ?offset:int -> t -> Map_mode.t -> unit Promise.t
+    (** [map_async_p b] is {!map_async} with promise-style error
+        handling. JavaScript promise rejections are raised as
+        exceptions. *)
+
     val get_mapped_range :
       ?size:int -> ?offset:int -> t -> Brr.Tarray.Buffer.t
     (** [get_mapped_range b] is the {{:https://developer.mozilla.org/en-US/docs/Web/API/GPUBuffer/getMappedRange}mapped range} of [b]. *)
@@ -924,6 +930,11 @@ module Gpu : sig
 
     val get_compilation_info : t -> Compilation_info.t Fut.or_error
    (** [get_compilation_info sm] is the {{:https://developer.mozilla.org/en-US/docs/Web/API/GPUShaderModule/getCompilationInfo}compilation info} of [sm]. *)
+
+    val get_compilation_info_p : t -> Compilation_info.t Promise.t
+    (** [get_compilation_info_p sm] is {!get_compilation_info} with
+        promise-style error handling. JavaScript promise rejections are
+        raised as exceptions. *)
 
     (**/**) include Jv.CONV with type t := t (**/**)
   end
@@ -2009,6 +2020,11 @@ module Gpu : sig
     (** [on_submitted_work_done q] resovles when submitted work on [q] {{:https://developer.mozilla.org/en-US/docs/Web/API/GPUQueue/onSubmittedWorkDone}
         is done}. *)
 
+    val on_submitted_work_done_p : t -> unit Promise.t
+    (** [on_submitted_work_done_p q] is {!on_submitted_work_done} with
+        promise-style error handling. JavaScript promise rejections are
+        raised as exceptions. *)
+
     val write_buffer :
       ?src_offset:int -> ?size:int -> t -> dst:Buffer.t -> dst_offset:int ->
       src:('a, 'b) Brr.Tarray.t -> unit
@@ -2246,6 +2262,10 @@ module Gpu : sig
     val lost : t -> Lost_info.t Fut.or_error
     (** [lost d] is the {{:https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/lost}lost} property of [d]. *)
 
+    val lost_p : t -> Lost_info.t Promise.t
+    (** [lost_p d] is {!lost} with promise-style error handling.
+        JavaScript promise rejections are raised as exceptions. *)
+
     val queue : t -> Queue.t
     (** [queue d] is the {{:https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/queue}queue} of [d]. *)
 
@@ -2261,6 +2281,11 @@ module Gpu : sig
 
     val pop_error_scope : t -> Error.t option Fut.or_error
     (** [pop_error_scope] {{:https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/popErrorScope}pops} the last error scope. *)
+
+    val pop_error_scope_p : t -> Error.t option Promise.t
+    (** [pop_error_scope_p] is {!pop_error_scope} with promise-style
+        error handling. JavaScript promise rejections are raised as
+        exceptions. *)
 
     (** {1:creating Creating ressources} *)
 
@@ -2309,6 +2334,12 @@ module Gpu : sig
       (Compute_pipeline.t, Pipeline_error.t) result Fut.t
     (** [create_compute_pipeline_async d descr] {{:https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createComputePipelineAsync}creates} a compute pipeline on [d] according to [descr]. *)
 
+    val create_compute_pipeline_async_p :
+      t -> Compute_pipeline.Descriptor.t -> Compute_pipeline.t Promise.t
+    (** [create_compute_pipeline_async_p d descr] is
+        {!create_compute_pipeline_async} with promise-style error
+        handling. Pipeline errors are raised via {!Promise.Reject}. *)
+
     val create_render_pipeline :
       t -> Render_pipeline.Descriptor.t -> Render_pipeline.t
     (** [create_render_pipeline d descr] {{:https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline}creates} a render pipeline on [d]
@@ -2318,6 +2349,12 @@ module Gpu : sig
       t -> Render_pipeline.Descriptor.t ->
       (Compute_pipeline.t, Pipeline_error.t) result Fut.t
     (** [create_render_pipeline_async d descr] {{:https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipelineAsync}creates} a render pipeline on [d] according to [descr]. *)
+
+    val create_render_pipeline_async_p :
+      t -> Render_pipeline.Descriptor.t -> Compute_pipeline.t Promise.t
+    (** [create_render_pipeline_async_p d descr] is
+        {!create_render_pipeline_async} with promise-style error
+        handling. Pipeline errors are raised via {!Promise.Reject}. *)
 
     val create_query_set : t -> Query.Set.Descriptor.t -> Query.Set.t
     (** [create_query_set d descr] {{:https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createQuerySet}creates} a query set on [d] according to
@@ -2402,6 +2439,12 @@ module Gpu : sig
     (** [request_device a]
         {{:https://developer.mozilla.org/en-US/docs/Web/API/GPUAdapter/requestDevice}requests} the device of [a]. *)
 
+    val request_device_p :
+      ?descriptor:Device.Descriptor.t -> t -> Device.t Promise.t
+    (** [request_device_p a] is {!request_device} with promise-style
+        error handling. JavaScript promise rejections are raised as
+        exceptions. *)
+
     val info : t -> Info.t
     (** [info a] is the adapter {{:https://developer.mozilla.org/en-US/docs/Web/API/GPUAdapter/info}info} of [a]. *)
 
@@ -2452,6 +2495,11 @@ module Gpu : sig
   (** [request_adapter gpu]
       {{:https://developer.mozilla.org/en-US/docs/Web/API/GPU/requestAdapter}
       requests} an adapter from [gpu]. *)
+
+  val request_adapter_p : ?opts:opts -> t -> Adapter.t option Promise.t
+  (** [request_adapter_p gpu] is {!request_adapter} with promise-style
+      error handling. JavaScript promise rejections are raised as
+      exceptions. *)
 
   (**/**) include Jv.CONV with type t := t (**/**)
 

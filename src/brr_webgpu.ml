@@ -89,6 +89,10 @@ module Gpu = struct
       let mode = Jv.of_int mode in
       Fut.of_promise ~ok:ignore @@ Jv.call b "mapAsync" [|mode; offset; size|]
 
+    let map_async_p ?size ?offset b mode =
+      Promise.of_fut_result' ~error:(fun e -> Jv.Error e) @@
+      map_async ?size ?offset b mode
+
     let get_mapped_range ?size ?offset b =
       let size = Jv.of_option ~none:Jv.undefined Jv.of_int size in
       let offset = Jv.of_option ~none:Jv.undefined Jv.of_int offset in
@@ -642,6 +646,10 @@ module Gpu = struct
     let get_compilation_info m =
       let ok = Compilation_info.of_jv in
       Fut.of_promise ~ok @@ Jv.call m "getCompilationInfo" [||]
+
+    let get_compilation_info_p m =
+      Promise.of_fut_result' ~error:(fun e -> Jv.Error e) @@
+      get_compilation_info m
   end
 
   module Programmable_stage = struct
@@ -1492,6 +1500,10 @@ module Gpu = struct
     let on_submitted_work_done q =
       Fut.of_promise ~ok:ignore @@ Jv.call q "onSubmittedWorkDone" [||]
 
+    let on_submitted_work_done_p q =
+      Promise.of_fut_result' ~error:(fun e -> Jv.Error e) @@
+      on_submitted_work_done q
+
     let write_buffer ?(src_offset = 0) ?size q ~dst ~dst_offset ~src =
       let dst = Buffer.to_jv dst and dst_offset = Jv.of_int dst_offset in
       let src = Brr.Tarray.to_jv src in
@@ -1738,12 +1750,20 @@ module Gpu = struct
     let destroy d = ignore @@ Jv.call d "destroy" [||]
     let lost d = Fut.of_promise ~ok:Lost_info.of_jv (Jv.get d "lost")
 
+    let lost_p d =
+      Promise.of_fut_result' ~error:(fun e -> Jv.Error e) @@
+      lost d
+
     let push_error_scope d filter =
       ignore @@ Jv.call d "pushErrorScope" [| Jv.of_jstr filter |]
 
     let pop_error_scope d =
       let ok = Jv.to_option Error.of_jv in
       Fut.of_promise ~ok @@ Jv.call d "popErrorScope" [||]
+
+    let pop_error_scope_p d =
+      Promise.of_fut_result' ~error:(fun e -> Jv.Error e) @@
+      pop_error_scope d
 
     let create_buffer d bd =
       let bd = Buffer.Descriptor.to_jv bd in
@@ -1788,6 +1808,11 @@ module Gpu = struct
       Fut.of_promise' ~ok ~error @@
       Jv.call d "createComputePipelineAsync" [| cd |]
 
+    let create_compute_pipeline_async_p d cd =
+      Promise.of_fut_result'
+        ~error:(fun e -> Promise.Reject (Pipeline_error.to_jv e))
+        (create_compute_pipeline_async d cd)
+
     let create_render_pipeline d cd =
       let cd = Render_pipeline.Descriptor.to_jv cd in
       Render_pipeline.of_jv @@ Jv.call d "createRenderPipeline" [| cd |]
@@ -1798,6 +1823,11 @@ module Gpu = struct
       let error = Pipeline_error.of_jv in
       Fut.of_promise' ~ok ~error @@
       Jv.call d "createRenderPipelineAsync" [| rd |]
+
+    let create_render_pipeline_async_p d rd =
+      Promise.of_fut_result'
+        ~error:(fun e -> Promise.Reject (Pipeline_error.to_jv e))
+        (create_render_pipeline_async d rd)
 
     let create_query_set d qd =
       let qd = Query.Set.Descriptor.to_jv qd in
@@ -1844,6 +1874,10 @@ module Gpu = struct
     let request_device ?descriptor:(descr = Jv.undefined) a =
       Fut.of_promise ~ok:Device.of_jv @@ Jv.call a "requestDevice" [|descr|]
 
+    let request_device_p ?descriptor a =
+      Promise.of_fut_result' ~error:(fun e -> Jv.Error e) @@
+      request_device ?descriptor a
+
     let info a = Jv.get a "info"
   end
 
@@ -1878,6 +1912,10 @@ module Gpu = struct
   let request_adapter ?(opts = Jv.undefined) g =
     let ok = Jv.to_option Adapter.of_jv in
     Fut.of_promise ~ok @@ Jv.call g "requestAdapter" [| opts |]
+
+  let request_adapter_p ?opts g =
+    Promise.of_fut_result' ~error:(fun e -> Jv.Error e) @@
+    request_adapter ?opts g
 
   (* Canvas context *)
 
