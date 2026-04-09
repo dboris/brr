@@ -1,4 +1,4 @@
-(lang dune 3.2)
+(lang dune 3.18)
 (using dune_site 0.1)
 
 (name brr)
@@ -10,7 +10,7 @@
 
 (authors "The brr programmers")
 
-(maintainers "Daniel Bünzli <daniel.buenzli@erratique.ch>")
+(maintainers "Daniel Bünzli <daniel.buenzl i@erratique.ch>")
 
 (source (uri git+https://erratique.ch/repos/brr.git))
 
@@ -43,5 +43,6 @@ Homepage: <https://erratique.ch/software/brr>")
   (ocaml               (>= 4.08.0))
   (dune                :build)
   (ocamlfind           :build)
-  (js_of_ocaml-compiler (>= 5.5.0))
-  (js_of_ocaml-toplevel (>= 5.5.0))))
+  (js_of_ocaml-compiler (>= 6.0.1))
+  (js_of_ocaml-toplevel (>= 6.0.1)))
+ (maintenance_intent "(latest)"))
