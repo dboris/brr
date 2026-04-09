@@ -93,7 +93,7 @@ let base_css = `File ~/"test/base.css"
 let test ?(meta = B0_meta.empty) ?doc ?(requires = []) ?(srcs = []) src =
   let srcs = `File src :: base_css :: srcs in
   let requires = brr :: requires in
-  let name = Fpath.basename ~strip_ext:true src in
+  let name = Fpath.basename ~drop_exts:true src in
   let meta =
     meta |> B0_meta.(tag test) |> ~~ B0_jsoo.compile_opts Cmd.(arg "--pretty")
   in
@@ -113,6 +113,7 @@ let test_base64 = test_module "Brr" "Base64"
 let test_c2d = test_module "Brr_canvas" "C2d"
 let test_clipboard = test_module "Brr_io" "Clipboard"
 let test_console = test_module "Brr" "Console"
+let test_css_highlight = test ~/"test/test_css_highlight.ml"
 let test_file = test_module "Brr" "File"
 let test_geo = test_module "Brr_io" "Geolocation"
 let test_gl = test_module "Brr_canvas" "Gl"
@@ -177,9 +178,9 @@ let default =
       [ "ocaml", {|>= "4.08.0"|};
         "ocamlfind", {|build|};
         "ocamlbuild", {|build|};
-        "topkg", {|build & >= "1.0.3"|};
-        "js_of_ocaml-compiler", {|>= "5.5.0"|};
-        "js_of_ocaml-toplevel", {|>= "5.5.0"|} ]
+        "topkg", {|build & >= "1.1.0"|};
+        "js_of_ocaml-compiler", {|>= "6.0.1"|};
+        "js_of_ocaml-toplevel", {|>= "6.0.1"|} ]
       |> B0_meta.tag B0_opam.tag
   in
   B0_pack.make "default" ~doc:"brr package" ~meta ~locked:true @@

@@ -1,5 +1,42 @@
 
-- Fix `At.wrap` attribute, it was defined as `value`. 
+- Add `El.dialog`.
+
+- Add `At.{role,popover,popoveraction,popovertargetaction`}.
+- Add `El.{show,hide,toggle}_popover`.
+- Fix `Fetch.Request.method'`.
+  Thanks to Puneeth Chaganti for the patch (#83).
+
+- Replace deprecated and unsupported `Gpu.Adapter.request_adapter_info` 
+  by `Gpu.Adapter.info`.
+  Thanks to Jack Nørskov Jørgensen for the patch (#82).
+
+
+v0.0.8 2025-07-25 Zagreb
+------------------------
+
+- Add `Brr_css.{Highlight,HighlightRegistry,Css}` a binding to the
+  CSS Custom Highlight API.
+- Add `Brr.Range` a binding to `Range` objects.
+- Add `Brr.Regexp` a binding to `RegExp` objects.
+- Add `El.text_content` a binding to `Node.textContent`.
+- Add `El.Prop.hidden` binding the `hidden` property.
+- Add more arguments to `El.scroll_into_view`.
+  Thanks to Paul-Elliot Anglès d'Auriac for the patch (#70).
+- Add `El.Style.zoom` property.
+  Thanks to Paul-Elliot Anglès d'Auriac for the patch (#74).
+- Add `El.offset_{h,w,top,left,parent}`.
+  Thanks to Paul-Elliot Anglès d'Auriac for the patch (#76).
+- Add `Window.parent`.
+  Thanks to Paul-Elliot Anglès d'Auriac for the patch (#73).
+- Add `Window.inner_{width,height}`.
+  Thanks to Paul-Elliot Anglès d'Auriac for the patch (#75).
+- Add `Canvas.attrs_create` which fixes the shadowing issue by
+  the `Canvas.attrs` getter that prevented from creating these values.
+  Thanks to Tim Ats for reporting and @naora for fixing (#63, #79).
+- Add `` `Type_error `` case to `Jv.Error.enum`.
+
+- Fix callbacks in `Brr_io.Geolocalation`. Thanks to Jérôme Vouillon (#80).
+- Fix `At.wrap` attribute, it was defined as `value`.
   Thanks to Brendan Zabarauskas for the patch (#66).
 - Fix `Result_syntax.(and*)`. Thanks to Jérôme Vouillon.
 - Fix `Service_worker.{script_url,state}`. Thanks to Jérôme Vouillon.

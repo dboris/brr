@@ -705,7 +705,7 @@ module Tarray = struct
 
   let uint8_of_buffer b = of_buffer Uint8 b
 
-  external to_string : uint8 -> string = "caml_string_of_array"
+  external to_string : uint8 -> string = "caml_string_of_uint8_array"
 
   let of_jstr s =
     let enc = Jv.new' (Jv.get Jv.global "TextEncoder") [||] in
@@ -1078,6 +1078,122 @@ module Uri = struct
   let decode_component s = code decode_component s
 end
 
+module Regexp = struct
+  module Result = struct
+    type t = Jv.t
+    include (Jv.Id : Jv.CONV with type t := t)
+
+    let input r = Jv.Jstr.get r "input"
+    let match' r = Jv.to_jstr (Jv.Jarray.get r 0)
+    let start_index r = Jv.Int.get r "index"
+    let stop_index r = start_index r + Jstr.length (match' r)
+    let fold_groups f r acc =
+      let acc = ref acc in
+      for i = 1 (* 0 is the whole match *) to Jv.Jarray.length r - 1 do
+        acc := f (Jv.to_jstr (Jv.Jarray.get r i)) !acc
+      done;
+      !acc
+
+    let fold_group_indices f r acc = match Jv.find r "indices" with
+    | None -> acc (* happens if regexp had no [d] flag. *)
+    | Some a ->
+        let acc = ref acc in
+        for i = 1 (* 0 is the whole match *) to Jv.Jarray.length a - 1 do
+          let range = Jv.Jarray.get a i in
+          let start = Jv.to_int (Jv.Jarray.get range 0) in
+          let stop = Jv.to_int (Jv.Jarray.get range 1) in
+          acc := f ~start ~stop !acc
+        done;
+        !acc
+
+    (* No iterator protocol on Object members ? *)
+    let obj_entries jv = Jv.call (Jv.get Jv.global "Object") "entries" [| jv |]
+    let obj_key a = Jv.Jarray.get a 0
+    let obj_value a = Jv.Jarray.get a 1
+
+    let fold_named_groups f r acc = match Jv.find r "groups" with
+    | None -> acc
+    | Some groups ->
+        let entries = obj_entries groups in
+        let acc = ref acc in
+        for i = 0 to Jv.Jarray.length entries - 1 do
+          let entry = Jv.Jarray.get entries i in
+          let match' = obj_value entry in
+          if Jv.is_undefined match' then () else
+          let name = Jv.to_jstr (obj_key entry) in
+          acc := f ~name (Jv.to_jstr match') !acc
+        done;
+        !acc
+
+    let fold_named_group_indices f r acc = match Jv.find r "indices" with
+    | None -> acc (* happens if regexp had no [d] flag. *)
+    | Some a ->
+        match Jv.find a "groups" with
+        | None -> acc
+        | Some groups ->
+            let entries = obj_entries groups in
+            let acc = ref acc in
+            for i = 0 to Jv.Jarray.length entries - 1 do
+              let entry = Jv.Jarray.get entries i in
+              let range = obj_value entry in
+              if Jv.is_undefined range then () else
+              let name = Jv.to_jstr (obj_key entry) in
+              let start = Jv.to_int (Jv.Jarray.get range 0) in
+              let stop = Jv.to_int (Jv.Jarray.get range 1) in
+              acc := f ~name ~start ~stop !acc
+            done;
+            !acc
+  end
+
+  type t = Jv.t
+  include (Jv.Id : Jv.CONV with type t := t)
+
+  let regexp = Jv.get Jv.global "RegExp"
+  let escape s = Jv.to_jstr (Jv.call regexp "escape" Jv.[|of_jstr s|])
+  let create ?flags s =
+    let flags = Jv.of_option ~none:Jv.undefined Jv.of_jstr flags in
+    Jv.new' regexp Jv.[|of_jstr s; flags|]
+
+  let exec r s =
+    Jv.to_option Result.of_jv @@ Jv.call r "exec" Jv.[|of_jstr s|]
+
+  let match' r s =
+    Jv.to_option Result.of_jv @@ Jv.call (Jv.of_jstr s) "match" Jv.[|r|]
+
+  let fold_matches r f s acc =
+    let iter = Jv.call (Jv.of_jstr s) "matchAll" Jv.[|r|] in
+    Jv.It.fold Result.of_jv f iter acc
+
+  let replace r ~by s =
+    Jv.to_jstr @@ Jv.call (Jv.of_jstr s) "replace" Jv.[|r; of_jstr by|]
+
+  let replace_all r ~by s =
+    Jv.to_jstr @@ Jv.call (Jv.of_jstr s) "replaceAll" Jv.[|r; of_jstr by|]
+
+  let search r s =
+    Jv.to_int @@ Jv.call (Jv.of_jstr s) "search" Jv.[|r|]
+
+  let split ?limit r s = match limit with
+  | None -> Jv.to_jstr_array @@ Jv.call (Jv.of_jstr s) "split" Jv.[|r|]
+  | Some limit ->
+      Jv.to_jstr_array @@ Jv.call (Jv.of_jstr s) "split" Jv.[|r; of_int limit|]
+
+  let test r s = Jv.to_bool @@ Jv.call r "test" Jv.[|of_jstr s|]
+  let last_index r = Jv.Int.get r "lastIndex"
+  let set_last_index r i = Jv.Int.set r "lastIndex" i
+  let dot_all r = Jv.Bool.get r "dotAll"
+  let flags r = Jv.Jstr.get r "flags"
+  let global r = Jv.Bool.get r "global"
+  let has_indices r = Jv.Bool.get r "hasIndices"
+  let ignore_case r = Jv.Bool.get r "ignoreCase"
+  let multiline r = Jv.Bool.get r "multiline"
+  let source r = Jv.Jstr.get r "source"
+  let sticky r = Jv.Bool.get r "sticky"
+  let unicode r = Jv.Bool.get r "unicode"
+  let unicode_sets r = Jv.Bool.get r "unicodeSets"
+end
+
+
 (* DOM interaction *)
 
 module At = struct
@@ -1121,8 +1237,12 @@ module At = struct
     let method' = Jstr.v "method"
     let name = Jstr.v "name"
     let placeholder = Jstr.v "placeholder"
+    let popover = Jstr.v "popover"
+    let popovertarget = Jstr.v "popovertarget"
+    let popovertargetaction = Jstr.v "popovertargetaction"
     let rel = Jstr.v "rel"
     let required = Jstr.v "required"
+    let role = Jstr.v "role"
     let rows = Jstr.v "rows"
     let selected = Jstr.v "selected"
     let spellcheck = Jstr.v "spellcheck"
@@ -1162,8 +1282,12 @@ module At = struct
   let method' s = v Name.method' s
   let name s = v Name.name s
   let placeholder s = v Name.placeholder s
+  let popover s = v Name.popover s
+  let popovertarget s = v Name.popovertarget s
+  let popovertargetaction s = v Name.popovertargetaction s
   let rel s = v Name.rel s
   let required = true' Name.required
+  let role s = v Name.role s
   let rows i = int Name.rows i
   let selected = true' Name.selected
   let spellcheck = v Name.spellcheck
@@ -1243,6 +1367,8 @@ module El = struct
   let txt_text txt = match is_txt txt with
   | true -> Jv.Jstr.get txt "nodeValue"
   | false -> Jstr.empty
+
+  let text_content e = Jv.Jstr.get e "textContent"
 
   external as_target : t -> Ev.target = "%identity"
 
@@ -1327,6 +1453,7 @@ module El = struct
 
     let checked = bool (Jstr.v "checked")
     let height = int (Jstr.v "height")
+    let hidden = bool (Jstr.v "hidden")
     let id = jstr (Jstr.v "id")
     let name = jstr (Jstr.v "name")
     let title = jstr (Jstr.v "title")
@@ -1363,6 +1490,7 @@ module El = struct
     let visibility = Jstr.v "visibility"
     let width = Jstr.v "width"
     let z_index = Jstr.v "z-index"
+    let zoom = Jstr.v "zoom"
   end
 
   let computed_style ?(w = Jv.get Jv.global "window") p e =
@@ -1399,6 +1527,16 @@ module El = struct
   let bound_w e = Jv.Float.get (Jv.call e "getBoundingClientRect" [||]) "width"
   let bound_h e = Jv.Float.get (Jv.call e "getBoundingClientRect" [||]) "height"
 
+  (* Offset *)
+
+  let offset_w e = Jv.Int.get e "offsetWidth"
+  let offset_h e = Jv.Int.get e "offsetHeight"
+
+  let offset_left e = Jv.Int.get e "offsetLeft"
+  let offset_top e = Jv.Int.get e "offsetTop"
+
+  let offset_parent e = Jv.get e "offsetParent" |> Jv.to_option of_jv
+
   (* Scrolling *)
 
   let scroll_x e = Jv.Float.get e "scrollLeft"
@@ -1406,9 +1544,25 @@ module El = struct
   let scroll_w e = Jv.Float.get e "scrollWidth"
   let scroll_h e = Jv.Float.get e "scrollHeight"
 
-  let scroll_into_view ?(align_v = `Start) e =
-    let align = match align_v with `Start -> true | `End -> false in
-    ignore @@ Jv.call e "scrollIntoView" [| Jv.of_bool align |]
+  let scroll_into_view ?(align_v = `Start) ?behavior e =
+    let align = match align_v with
+      | `Start -> "start"
+      | `Center -> "center"
+      | `Nearest -> "nearest"
+      | `End -> "end"
+    in
+    let behavior =
+      Jv.of_option ~none:Jv.null Jv.of_string @@
+        Option.map (function
+            | `Smooth -> "smooth"
+            | `Instant -> "instant"
+            | `Auto -> "auto")
+          behavior
+    in
+    let options =
+      Jv.obj [|"block", Jv.of_string align; "behavior" , behavior |]
+    in
+    ignore @@ Jv.call e "scrollIntoView" [| options |]
 
   (* Focus *)
 
@@ -1441,7 +1595,22 @@ module El = struct
     ignore @@ Jv.call e "requestPointerLock" [||];
     fut
 
-  (* Click simluation *)
+  (* Popover *)
+
+  let show_popover ?source e =
+    let args = match source with
+    | None -> [||] | Some src -> [| Jv.obj [|"source", src|] |]
+    in
+    ignore @@ Jv.call e "showPopover" args
+
+  let hide_popover e = ignore @@ Jv.call e "hidePopover" [||]
+  let toggle_popover ?source e =
+    let args = match source with
+    | None -> [||] | Some src -> [| Jv.obj [|"source", src|] |]
+    in
+    Jv.to_bool @@ Jv.call e "togglePopover" args
+
+  (* Click simulation *)
 
   let click e = ignore (Jv.call e "click" [||])
   let select_text e = ignore (Jv.call e "select" [||])
@@ -1501,6 +1670,7 @@ module El = struct
     let del = Jstr.v "del"
     let details = Jstr.v "details"
     let dfn = Jstr.v "dfn"
+    let dialog = Jstr.v "dialog"
     let div = Jstr.v "div"
     let dl = Jstr.v "dl"
     let dt = Jstr.v "dt"
@@ -1616,6 +1786,7 @@ module El = struct
   let del = cons Name.del
   let details = cons Name.details
   let dfn = cons Name.dfn
+  let dialog = cons Name.dialog
   let div = cons Name.div
   let dl = cons Name.dl
   let dt = cons Name.dt
@@ -1698,6 +1869,85 @@ module El = struct
   let video = cons Name.video
   let wbr = void_cons Name.wbr
 end
+
+module Range = struct
+  type t = Jv.t
+  include (Jv.Id : Jv.CONV with type t := t)
+
+  type compare_how = int
+  let end_to_end = Jv.Int.get Jv.global "Range.END_TO_END"
+  let end_to_start = Jv.Int.get Jv.global "Range.END_TO_START"
+  let start_to_end = Jv.Int.get Jv.global "Range.START_TO_END"
+  let start_to_start = Jv.Int.get Jv.global "Range.START_TO_START"
+
+  let range = Jv.get Jv.global "Range"
+  let create () = Jv.new' range [||]
+  let clone_range r = Jv.call r "cloneRange" [||]
+  let collapse r b = ignore @@ Jv.call r "collapse" Jv.[|of_bool b|]
+  let collapse_to_start r = collapse r true
+  let collapse_to_end r = collapse r false
+
+  let compare_boundary_points r how r' =
+    Jv.to_int @@ Jv.call r "compareBoundaryPoints" [|Jv.of_int how; r'|]
+
+  let compare_point r el offset =
+    Jv.to_int @@ Jv.call r "comparePoint" [|El.to_jv el; Jv.of_int offset|]
+
+  (*  let create_contextual_fragment r = failwith "createContextualFragment" *)
+
+  let delete_contents r = ignore @@ Jv.call r "deleteContents" [||]
+  (*
+  let extract_contents r = failwith "extractContents"
+  let get_bounding_client_rect r = failwith "getBoundingClientRect"
+  let get_client_rects r = failwith "getClientRects" *)
+
+  let insert_node r el = ignore @@ Jv.call r "insertNode" [|El.to_jv el|]
+  let intersects_node r el =
+    Jv.to_bool @@ Jv.call r "intersectsNode" [|El.to_jv el|]
+
+  let is_point_in_range r el offset =
+    Jv.to_bool @@ Jv.call r "isPointInRange" [|El.to_jv el; Jv.of_int offset|]
+
+  let select_node r el = ignore @@ Jv.call r "selectNode" [|El.to_jv el|]
+
+  let select_node_contents r el =
+    ignore @@ Jv.call r "selectNodeContents" [|El.to_jv el|]
+
+  let set_end r el offset =
+    ignore @@ Jv.call r "setEnd" [|El.to_jv el; Jv.of_int offset|]
+
+  let set_end_after r el =
+    ignore @@ Jv.call r "setEndAfter" [|El.to_jv el|]
+
+  let set_end_before r el =
+    ignore @@ Jv.call r "setEndBefore" [|El.to_jv el|]
+
+  let set_start r el offset =
+    ignore @@ Jv.call r "setStart" [|El.to_jv el; Jv.of_int offset|]
+
+  let set_start_after r el =
+    ignore @@ Jv.call r "setStartAfter" [|El.to_jv el|]
+
+  let set_start_before r el =
+    ignore @@ Jv.call r "setStartBefore" [|El.to_jv el|]
+
+  let surround_contents r el =
+    ignore @@ Jv.call r "surroundContents" [|El.to_jv el|]
+
+  let to_string r = Jv.to_jstr @@ Jv.call r "toString" [||]
+
+  (* Properties *)
+
+  let collapsed r = Jv.Bool.get r "collapsed"
+  let common_ancestor_container r =
+    El.of_jv (Jv.get r "commonAncestorContainer")
+
+  let end_container r = El.of_jv (Jv.get r "endContainer")
+  let end_offset r = Jv.Int.get r "endOffset"
+  let start_container r = El.of_jv (Jv.get r "startContainer")
+  let start_offset r = Jv.Int.get r "sartOffset"
+end
+
 
 module Document = struct
   type t = El.document
@@ -1869,6 +2119,13 @@ module Window = struct
   let closed w = Jv.Bool.get w "closed"
   let scroll_x w = Jv.Float.get w "scrollX"
   let scroll_y w = Jv.Float.get w "scrollY"
+
+  let inner_width w = Jv.Int.get w "innerWidth"
+  let inner_height w = Jv.Int.get w "innerHeight"
+
+  let parent w =
+    let p = Jv.get w "parent" in
+    if p == w then None else Some p
 
   (* Media properties *)
 

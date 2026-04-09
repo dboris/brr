@@ -3,9 +3,12 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-(** Browser APIs.
+(** Browser and JavaScript language APIs.
 
-    Open this module to use it. It defines only modules in your scope. *)
+    Open this module to use it. It defines only modules in your scope.
+
+    {b Note.} The mix of JavaScript and browser APIs is unfortunate but
+    fixing the module organisation is likely not worth the cost on users. *)
 
 (** {1:data Data containers and encodings} *)
 
@@ -292,15 +295,15 @@ module Tarray : sig
       if [a] holds invalid UTF-8. *)
 
   val of_binary_jstr : Jstr.t -> (uint8, Jv.Error.t) result
-  (** [of_binary_jstr s] is an unsigned byte array with the bytes of the
-      {{:https://developer.mozilla.org/en-US/docs/Web/API/DOMString/Binary}
-      JavaScript binary string} [s]. Errors if a code unit of [s] is greater
-      than [255]. *)
+  (** [of_binary_jstr s] is an unsigned byte array with the bytes of
+      the binary string [s]. In [s] every byte is represented by a
+      code unit in the range \[[0];[255]\]. Errors if a code unit of [s] is
+      greater than [255]. *)
 
   val to_binary_jstr : uint8 -> Jstr.t
-  (** [to_binary_jstr a] is a
-      {{:https://developer.mozilla.org/en-US/docs/Web/API/DOMString/Binary}
-      JavaScript binary string} with the unsigned bytes of [a]. *)
+  (** [to_binary_jstr a] converts [a] to a binary string, a string in
+      which every byte is represented by a code unit in the range
+      \[[0];[255]\]. *)
 
   val to_int_jstr : ?sep:Jstr.t -> ('a, 'b) t -> Jstr.t
   (** [to_int_jstr ~sep a] is a string with the elements of [a] printed and
@@ -310,7 +313,7 @@ module Tarray : sig
   (** [to_hex_jstr ?sep a] is a string with the bytes of [a] printed in
       lowercase hex and separated by [sep] (defaults to {!Jstr.empty}). *)
 
-  external to_string :  uint8 -> string = "caml_string_of_array"
+  external to_string :  uint8 -> string = "caml_string_of_uint8_array"
   (** [to_string a] is an OCaml {e byte} string from the byte array. *)
 
   (** {1:bigarrays As bigarrays} *)
@@ -579,12 +582,16 @@ end
     As codec by the
     {{:https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON}JSON object}.
 
-    {b Warning.} This interface will change in the future. *)
+    {b Note.} This interface is not particularly useful for
+    programming in OCaml. To map JSON schemas to OCaml and back, describe
+    your JSON with {{:https://erratique.ch/software/jsont}jsont}. The
+    {{:https://erratique.ch/software/jsont/doc/Jsont_brr/index.html}[jsont.brr]
+    library} can use these descriptions with the JSON codec provided by your
+    JavaScript runtime. *)
 module Json : sig
 
   type t = Jv.t
-  (** The type for JSON values.
-      {b FIXME} have something more abstract. *)
+  (** The type for JSON values. *)
 
   val encode : t -> Jstr.t
   (** [encode v] encodes [v] to JSON using
@@ -796,6 +803,176 @@ module Uri : sig
   (** [decode s] percent-descodes a UTF-8 representation
       of [s]. See {{:https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/decodeURIComponent}decodeURIComponent}. Note that
       this has the same effect as {!decode}. *)
+
+  (**/**)
+  include Jv.CONV with type t := t
+  (**/**)
+end
+
+(** [RegExp] objects and matching. *)
+module Regexp : sig
+
+  (** Matching results.
+
+      This handles the {{:https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/exec#return_value}weird array}
+      returned by {!exec} or {!match'}. *)
+  module Result : sig
+    type t
+    (** The type for regular expression matching results. *)
+
+    val input : t -> Jstr.t
+    (** [input r] is the string that was matched against. *)
+
+    val match' : t -> Jstr.t
+    (** [match' r] is the matched string. *)
+
+    val start_index : t -> int
+    (** [start_index r] is the index of the start of {!match'} in
+        {!input}. *)
+
+    val stop_index : t -> int
+    (** [stop_index r] is the index after the end of {!match'}.
+        The last character of {!match'} is at [stop_index r - 1]
+        in {!input}. *)
+
+    val fold_groups : (Jstr.t -> 'a -> 'a) -> t -> 'a -> 'a
+    (** [fold_groups f r acc] folds [f] over the content of all
+        capturing groups (named included) in [r] starting with
+        [acc]. This is [acc] if there is no group. *)
+
+    val fold_group_indices :
+      (start:int -> stop:int -> 'a -> 'a) -> t -> 'a -> 'a
+    (** [fold_group_indices f r acc] is like {!fold_groups} but [f] is
+        given the [start] and [stop] index of the group which indicate it
+        spans the indices \[[start];[stop-1]\] of {!input}.
+
+        {b Warning.} The regexp needs the [d] flag for this to yield
+        results otherwise the function simply returns [acc].  *)
+
+    val fold_named_groups : (name:Jstr.t -> Jstr.t -> 'a -> 'a) -> t -> 'a -> 'a
+    (** [fold_named_groups f r acc] folds [f] over the content of named
+        capturing groups in [r] starting with [acc]. *)
+
+    val fold_named_group_indices :
+      (name:Jstr.t -> start:int -> stop:int -> 'a -> 'a) -> t -> 'a -> 'a
+    (** [fold_named_group_indices f r acc] is like {!fold_named_groups} but
+        [f] is given the [start] and [stop] index of the group which indicate
+        it spans the indices \[[start];[stop-1]\] of {!input}.
+
+        {b Warning.} The regexp needs the [d] flag for this to yield
+        results otherwise the function simply returns [acc].  *)
+    (**/**)
+    include Jv.CONV with type t := t
+    (**/**)
+  end
+
+  type t
+  (** The type for
+      {{:https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp}
+      [RegExp]} objects. *)
+
+  val escape : Jstr.t -> Jstr.t
+  (** [escape s]
+      {{:https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/escape}escapes}
+      the regexp syntax literals in [s]. *)
+
+  val create : ?flags:Jstr.t -> Jstr.t -> t
+  (** [create ?flags s] is the regexp object for [s] using
+      {{:https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/RegExp#flags}[flags]} if specified.
+
+      @raise Jv.Error see {{:https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/RegExp#exceptions}details}.
+  *)
+
+  val exec : t -> Jstr.t -> Result.t option
+  (** [exec r s]
+      {{:https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/exec}executes}
+      regular expression [r] on [s] at index {!last_index}. *)
+
+  val test : t -> Jstr.t -> bool
+  (** [test r s]
+      {{:https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/test}tests}
+      [s] against [r] and returns [true] if it matches. *)
+
+  val match' : t -> Jstr.t -> Result.t option
+  (** [match r s]
+      {{:https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/Symbol.match}matches}
+      [r] against [s]. See also {!exec}. *)
+
+  val fold_matches : t -> (Result.t -> 'a -> 'a) -> Jstr.t -> 'a -> 'a
+  (** [fold_matches r f s acc] folds [f] over the non-overlapping
+      matches of [r] in [s] starintg with [acc].
+
+      @raise Jv.Error see {{:https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/matchAll#exceptions}details}.
+  *)
+
+  val replace : t -> by:Jstr.t -> Jstr.t -> Jstr.t
+  (** [replace r ~by s]
+      {{:https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/Symbol.replace}replaces} the first match of [r] by [by] in
+      [s]. *)
+
+  val replace_all : t -> by:Jstr.t -> Jstr.t -> Jstr.t
+  (** [replace_all r ~by s]
+      {{:https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/replaceAll}replaces}
+      all non-overlapping matches of [r] by [by] in [s]. *)
+
+  val search : t -> Jstr.t -> int
+  (** [search r s] is the
+      {{:https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/Symbol.search}first index}
+      of [s] that matches [r] or [-1] if there is no match. *)
+
+  val split : ?limit:int -> t -> Jstr.t -> Jstr.t array
+  (** [split r s] {{:https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/Symbol.split}splits} [s] on delimiters
+      matched by [r]. *)
+
+  (** {1:props Properties} *)
+
+  val last_index : t -> int
+  (** [last_index r] is the
+      {{:https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/lastIndex}index} at which to start (sic) the next match. *)
+
+  val set_last_index : t -> int -> unit
+  (** [set_last_index r i] sets the {!last_index} in [r] to [i]. *)
+
+  val dot_all : t -> bool
+  (** [dot_all r] is [true] if [r] has the
+      {{:https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/RegExp#flags}[s] flag}. *)
+
+  val flags : t -> Jstr.t
+  (** [flags r] are the
+      {{:https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/flags}flags}
+      of [r]. *)
+
+  val global : t -> bool
+  (** [global r] is [true] if [r] has the
+      {{:https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/RegExp#flags}[g] flag}. *)
+
+  val has_indices : t -> bool
+  (** [has_indices r] is [true] if [r] has the
+      {{:https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/RegExp#flags}[d] flag}. *)
+
+  val ignore_case : t -> bool
+  (** [ignore_case r] is [true] if [r] has the
+      {{:https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/RegExp#flags}[i] flag}. *)
+
+  val multiline : t -> bool
+  (** [multiline r] is [true] if [r] has the
+      {{:https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/RegExp#flags}[m] flag}. *)
+
+  val source : t -> Jstr.t
+  (** [source r] is the
+      {{:https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/source}source text} of [r]. *)
+
+  val sticky : t -> bool
+  (** [sticky r] is [true] if [r] has the
+      {{:https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/RegExp#flags}[y] flag}. *)
+
+  val unicode : t -> bool
+  (** [unicode r] is [true] if [r] has the
+      {{:https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/RegExp#flags}[u] flag}. *)
+
+  val unicode_sets : t -> bool
+  (** [unicode_sets r] is [true] if [r] has the
+      {{:https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/RegExp#flags}[v] flag}. *)
 
   (**/**)
   include Jv.CONV with type t := t
@@ -1882,6 +2059,9 @@ module At : sig
     val method' : name
     val name : name
     val placeholder : name
+    val popover : name
+    val popovertarget : name
+    val popovertargetaction : name
     val rel : name
     val required : name
     val rows : name
@@ -1985,6 +2165,15 @@ module At : sig
   (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes}
       placeholder} *)
 
+  val popover : Jstr.t cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Global_attributes/popover}popover} *)
+
+  val popovertarget : Jstr.t cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/button#popovertarget}popovertarget} *)
+
+  val popovertargetaction : Jstr.t cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/button#popovertargetaction}popovertargetaction} *)
+
   val rel : Jstr.t cons
   (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/rel}
       rel} *)
@@ -1992,6 +2181,9 @@ module At : sig
   val required : t
   (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/required}
       required} *)
+
+  val role : Jstr.t cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Roles}role} *)
 
   val rows : int cons
   (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/textarea#attr-rows}rows} *)
@@ -2103,6 +2295,11 @@ module El : sig
   (** [txt_text e] is the text of [e] if [e] is a {{!is_txt}text node}
       and the empty string otherwise. *)
 
+  val text_content : t -> Jstr.t
+  (** [text_content e] is the
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent}
+      text content} of [e] and its descendents. *)
+
   val document : t -> document
   (** [document e] is the document of [e]. *)
 
@@ -2209,6 +2406,7 @@ module El : sig
 
     val checked : bool t
     val height : int t
+    val hidden : bool t
     val id : Jstr.t t
     val name : Jstr.t t
     val title : Jstr.t t
@@ -2249,6 +2447,7 @@ module El : sig
     val visibility : prop
     val width : prop
     val z_index : prop
+    val zoom : prop
   end
 
   val computed_style : ?w:window -> Style.prop -> t -> Jstr.t
@@ -2310,6 +2509,52 @@ module El : sig
   val bound_h : t -> float
   (** [bound_h e] is [e]'s bound height. *)
 
+  (** {1:offset Offset} *)
+
+  val offset_h : t -> int
+  (** [offset_w e] is the height of [e] in CSS pixels, excluding borders,
+      padding, scrollbars and pseudo-elements, and ignoring transforms.
+
+      See the
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/offsetHeight}MDN
+      doc} and the
+      {{:https://www.w3.org/TR/cssom-view-1/#dom-htmlelement-offsetheight}specification}
+      for a precise description. *)
+
+  val offset_w : t -> int
+  (** [offset_w e] is the width of [e] in CSS pixels, excluding borders,
+      padding, scrollbars and pseudo-elements, and ignoring transforms.
+
+      See the
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/offsetWidth}MDN
+      doc} and the
+      {{:https://www.w3.org/TR/cssom-view-1/#dom-htmlelement-offsetwidth}specification}
+      for a precise description. *)
+
+  val offset_top : t -> int
+  (** [offset_top e] is the number of CSS pixels that the upper left corner of
+      the current element is offset to the left within the
+      {{!offset_parent}parent node}. See the
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/offsetTop}MDN
+      doc} and the
+      {{:https://www.w3.org/TR/cssom-view-1/#dom-htmlelement-offsettop}specification}
+      for a precise description. *)
+
+  val offset_left : t -> int
+  (** [offset_left e] is the number of CSS pixels that the upper left corner of
+      the current element is offset to the left within the
+      {{!offset_parent}parent node}. See the
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/offsetLeft}MDN
+      doc} and the
+      {{:https://www.w3.org/TR/cssom-view-1/#dom-htmlelement-offsetleft}specification}
+      for a precise description. *)
+
+  val offset_parent : t -> t option
+  (** [offset_parent e] is the element (if it exists) which is the closest
+      (nearest in the containment hierarchy)
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/offsetParent}positioned
+      ancestor element}. *)
+
   (** {1:scrolling Scrolling} *)
 
   val scroll_x : t -> float
@@ -2326,12 +2571,38 @@ module El : sig
   (** [scroll_h e] is the minimum height the element would require
       to display without a vertical scrollbar. *)
 
-  val scroll_into_view : ?align_v:[ `Start | `End ] -> t -> unit
-  (** [scroll_into_view ~align e]
-      {{:https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollIntoView}scrolls} [e] into view. If [align_v] is [`Start] (default) the top of the
-      element is align with to to the top of the scrollable area. If
-      [align_v] is [`End] the bottom of the element is aligned with the
-      bottom of the scrollable area. *)
+  val scroll_into_view :
+    ?align_v:[ `Center | `End | `Nearest | `Start ] ->
+    ?behavior:[< `Auto | `Instant | `Smooth ] ->
+    t ->
+    unit
+  (** [scroll_into_view ~align_v ~behavior e]
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollIntoView}scrolls}
+      [e] into view.
+
+      [align_v] controls the
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollIntoView#block}block}
+      option:
+      {ul
+      {- with [`Start], (default) the top of the element is align with to to the
+        top of the scrollable area.}
+      {- with [`Center], the element vertically at the center of the scrollable
+         container, positioning it in the middle of the visible area.}
+      {- with [`End], the bottom of the element is aligned with the bottom of the
+        scrollable area.}
+      {- with [`Nearest], the element is to the nearest edge in the vertical
+        direction. If the element is closer to the top edge of the scrollable
+        container, it will align to the top; if it's closer to the bottom edge,
+        it will align to the bottom. This minimizes the scrolling distance.}}
+
+      [behavior] controls the
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollIntoView#behavior}behavior}
+      option:
+      {ul
+      {- with [`Auto] (default) scroll behavior is determined by the computed
+        value of [scroll-behavior].}
+      {- with [`Smooth] scrolling should animate smoothly.}
+      {- with [`Instant] scrolling should happen instantly in a single jump.}} *)
 
   (** {1:focus Focus} *)
 
@@ -2342,6 +2613,20 @@ module El : sig
   val set_has_focus : bool -> t -> unit
   (** [set_has_focus b e] sets the focus of [e] to [b] in the document
       it belongs do. *)
+
+  (** {1:popover Popovers} *)
+
+  val show_popover : ?source:t -> t -> unit
+  (** [show_popover e]
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/showPopover}shows} the popover element [e]. If [source] is specified
+      it is the invoker of the popover. *)
+
+  val hide_popover : t -> unit
+  (** [hide_popover e] {{:https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/hidePopover}hides} the popover element [e]. *)
+
+  val toggle_popover : ?source:t -> t -> bool
+  (** [toggle_popover e] {{:https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/togglePopover}toggles} the popover element [e]. If [source]
+      is specified it is the invoker of the popover. *)
 
   (** {1:pointerlock Pointer locking} *)
 
@@ -2447,6 +2732,7 @@ module El : sig
     val del : tag_name
     val details : tag_name
     val dfn : tag_name
+    val dialog : tag_name
     val div : tag_name
     val dl : tag_name
     val dt : tag_name
@@ -2640,6 +2926,10 @@ module El : sig
   val dfn : cons
   (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/dfn}
       dfn} *)
+
+  val dialog : cons
+  (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/dialog}
+      dialog} *)
 
   val div : cons
   (** {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/div}
@@ -3041,6 +3331,184 @@ module Document : sig
   (**/**)
 end
 
+
+(** [Range] objects. *)
+module Range : sig
+
+  (** {1:cmp Comparison constants} *)
+
+  type compare_how
+  (** Constants for the first argument of {!compare_boundary_points}. *)
+
+  val end_to_end : compare_how
+  (** [Range.END_TO_END]. *)
+
+  val end_to_start : compare_how
+  (** [Range.END_TO_START]. *)
+
+  val start_to_end : compare_how
+  (** [Range.START_TO_END]. *)
+
+  val start_to_start : compare_how
+  (** [Range.START_TO_START]. *)
+
+  (** {1:ranges Ranges} *)
+
+  type t
+  (** The type for
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/Range}
+      [Range]} objects. *)
+
+  val create : unit -> t
+  (** [create ()] is a new range object. *)
+
+  val clone_range : t -> t
+  (** [clone_range r]
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/Range/cloneRange}
+      clones} [r]. *)
+
+  val collapse_to_start : t -> unit
+  (** [collapse_to_start r]
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/Range/collapse}
+      collapses} [r] to its start. *)
+
+  val collapse_to_end : t -> unit
+  (** [collapse_to_end r]
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/Range/collapse}
+      collapses} [r] to its end. *)
+
+  val compare_boundary_points : t -> compare_how -> t -> int
+  (** [compare_boundary_points r how r']
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/Range/compareBoundaryPoints}compares} [r] to [r']. *)
+
+  val compare_point : t -> El.t -> int -> int
+  (** [compare_point r el offset]
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/Range/comparePoint}
+      compare} [r] to [el]. *)
+
+  (*
+  val create_contextual_fragment : t -> 'a
+  (** [create_contextual_fragment r] {{:https://developer.mozilla.org/en-US/docs/Web/API/Range/createContextualFragment}createContextualFragment} *)
+  *)
+
+  val delete_contents : t -> unit
+  (** [delete_contents r]
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/Range/deleteContents}
+      deletes} the content in range [r]. *)
+
+  (*
+  val extract_contents : t -> 'a
+  (** [extract_contents r] {{:https://developer.mozilla.org/en-US/docs/Web/API/Range/extractContents}extractContents} *)
+
+  val get_bounding_client_rect : t -> 'a
+  (** [get_bounding_client_rect r] {{:https://developer.mozilla.org/en-US/docs/Web/API/Range/getBoundingClientRect}getBoundingClientRect} *)
+
+  val get_client_rects : t -> 'a
+  (** [get_client_rects r] {{:https://developer.mozilla.org/en-US/docs/Web/API/Range/getClientRects}getClientRects} *)
+  *)
+
+  val insert_node : t -> El.t -> unit
+  (** [insert_node r el]
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/Range/insertNode}
+      insert} [el] at the start of [r]. *)
+
+  val intersects_node : t -> El.t -> bool
+  (** [intersects_node r e] is [true] if [el]
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/Range/intersectsNode}
+      intersects} [r]. *)
+
+  val is_point_in_range : t -> El.t -> int -> bool
+  (** [is_point_in_range r el offset] is [true] if the point
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/Range/isPointInRange}
+      is in the range} of [r]. *)
+
+  val select_node : t -> El.t -> unit
+  (** [select_node r el]
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/Range/selectNode}
+      sets} [r] to conatin [el]. *)
+
+  val select_node_contents : t -> El.t -> unit
+  (** [select_node_contents r el]
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/Range/selectNodeContents}
+      sets} [r] to the contents of [el]. *)
+
+  val set_end : t -> El.t -> int -> unit
+  (** [set_end r el offset]
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/Range/setEnd}sets}
+      the end of [r] to [el]. *)
+
+  val set_end_after : t -> El.t -> unit
+  (** [set_end_after r el]
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/Range/setEndAfter}
+      sets} the end of [r] after the end of [el]. *)
+
+  val set_end_before : t -> El.t -> unit
+  (** [set_end_before r]
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/Range/setEndBefore}
+      sets} the end of [r] before the end of [el]. *)
+
+  val set_start : t -> El.t -> int -> unit
+  (** [set_start r el offset]
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/Range/setStart}
+      sets} the start of [r] to [el]. *)
+
+  val set_start_after : t -> El.t -> unit
+  (** [set_start_after r el]
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/Range/setStartAfter}
+      sets} the start of [r] after [el]. *)
+
+  val set_start_before : t -> El.t -> unit
+  (** [set_start_before r el]
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/Range/setStartBefore}
+      sets} the start of [r] before [el]. *)
+
+  val surround_contents : t -> El.t -> unit
+  (** [surround_contents r el]
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/Range/surroundContents}surrounds}
+      the content of [r] by [el]. *)
+
+  val to_string : t -> Jstr.t
+  (** [to_string r] converts [r]
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/Range/toString}
+      to a string}. *)
+
+  (** {1:properties Properties} *)
+
+  val collapsed : t -> bool
+  (** [collapsed r] indicates if [r] is
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/Range/collapsed}
+      collapsed}. *)
+
+  val common_ancestor_container : t -> El.t
+(** [common_ancestor_container r] is the
+    {{:https://developer.mozilla.org/en-US/docs/Web/API/Range/commonAncestorContainer}common ancestor container} of [r] *)
+
+  val end_container : t -> El.t
+  (** [end_container r] is the
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/Range/endContainer}
+      end container} of [r]. *)
+
+  val end_offset : t -> int
+  (** [end_offset r] is the
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/Range/endOffset}
+      end offset} of [r]. *)
+
+  val start_container : t -> El.t
+  (** [end_container r] is the
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/Range/startContainer}
+      start container} of [r]. *)
+
+  val start_offset : t -> int
+  (** [end_offset r] is the
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/Range/startOffset}
+      start offset} of [r]. *)
+
+  (**/**)
+  include Jv.CONV with type t := t
+  (**/**)
+end
+
+
 (** {1:browser Browser interaction} *)
 
 (** Aborting browser activities.
@@ -3337,6 +3805,26 @@ module Window : sig
   (** [scroll_y w] is the number of (sub)pixels the window is
       {{:https://developer.mozilla.org/en-US/docs/Web/API/Window/scrollY}
       vertically scrolled} by. *)
+
+  val inner_width : t -> int
+  (** [inner_width w] is the
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/Window/innerWidth}
+      interior height} of the window in CSS pixels, including the width of
+      the vertical scroll bar, if present. *)
+
+  val inner_height : t -> int
+  (** [inner_height w] is the
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/Window/innerHeight}
+      interior height} of the window in CSS pixels, including the height of
+      the horizontal scroll bar, if present. *)
+
+  val parent : t -> t option
+  (** [parent w] is the
+      {{:https://developer.mozilla.org/en-US/docs/Web/API/Window/parent}parent}
+      of the window, if it has one.
+
+      When a window is loaded in an [<iframe>], [<object>], or [<frame>], its
+      parent is the window with the element embedding the window. *)
 
   (** {1:media Media properties} *)
 
