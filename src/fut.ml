@@ -68,6 +68,11 @@ type 'a or_error = ('a, Jv.Error.t) result
 let ok v = return (Ok v)
 let error e = return (Error e)
 
+module Result = struct
+  let map_error fn f = map (Stdlib.Result.map_error fn) f
+  let fail_if cond e = if cond then error e else ok ()
+end
+
 let of_promise' ~ok ~error p =
   let ok v = Jv.Promise.resolve (Ok (ok v)) in
   let error e = Jv.Promise.resolve (Error (error e)) in
@@ -101,6 +106,6 @@ module Result_syntax = struct
   | Error _ as e -> return e
 
   let ( and* ) f0 f1 = map result_pair (pair f0 f1)
-  let ( let+ ) f fn = map (Result.map fn) f
+  let ( let+ ) f fn = map (Stdlib.Result.map fn) f
   let ( and+ ) = ( and* )
 end

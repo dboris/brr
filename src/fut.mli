@@ -77,6 +77,15 @@ val ok : 'a -> ('a, 'b) result
 val error : 'b -> ('a, 'b) result
 (** [error e] is [return (Error e)]. *)
 
+module Result : sig
+  val map_error : ('e -> 'f) -> ('a, 'e) result -> ('a, 'f) result
+  (** [map_error fn f] maps [fn] over errors determined by [f]. *)
+
+  val fail_if : bool -> 'e -> (unit, 'e) result
+  (** [fail_if cond e] is [error e] iff [cond] is [true] and [ok ()]
+      otherwise. *)
+end
+
 (** {1:promises Converting with JavaScript promises} *)
 
 val of_promise : ok:(Jv.t -> 'a) -> Jv.Promise.t -> 'a or_error
