@@ -2,7 +2,7 @@
 (using dune_site 0.1)
 
 (name brr)
-(version v0.0.7+dune)
+(version v0.0.8+promise)
 
 (generate_opam_files true)
 
